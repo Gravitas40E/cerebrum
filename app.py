@@ -57,6 +57,8 @@ MUTED = "#5d7a82"
 WHITE = "#e5f9fa"
 RED = "#ef7d7d"
 FONT_FAMILY = "X Typewriter"
+MAX_DASHBOARD_NOTE_TITLE_LENGTH = 44
+TRUNCATION_SUFFIX = "..."
 
 
 def register_font() -> str:
@@ -132,7 +134,7 @@ class MainApp:
         self.images = ImageLibrary()
 
         self.note_id: int | None = None
-        self.current_view: str | int = "all"
+        self.current_view: str | int = "dashboard"
         self.save_job: str | None = None
         self.loading_note = False
         self.background_job: str | None = None
@@ -147,6 +149,7 @@ class MainApp:
 
         self._build_background()
         self._build_shell()
+        self._update_view_layout()
         self._bind_shortcuts()
 
     def _build_background(self) -> None:
@@ -181,6 +184,7 @@ class MainApp:
         self._build_navigation(body)
         self._build_note_list(body)
         self._build_editor(body)
+        self._build_dashboard(body)
 
     def _build_topbar(self, master) -> None:
         top = Frame(master, bg=BG, height=86)
@@ -235,6 +239,7 @@ class MainApp:
         primary = Frame(nav, bg=PANEL)
         primary.grid(row=2, column=0, sticky="ew", padx=7, pady=8)
         for label, view in (
+            ("DASHBOARD", "dashboard"),
             ("ALL NOTES", "all"),
             ("PINNED", "pinned"),
             ("FAVORITES", "favorites"),
@@ -265,6 +270,7 @@ class MainApp:
             master, bg=PANEL, width=320,
             highlightthickness=1, highlightbackground=BORDER,
         )
+        self.note_panel = panel
         panel.grid(row=0, column=1, sticky="nsew", padx=5, pady=(0, 10))
         panel.grid_propagate(False)
         panel.grid_rowconfigure(1, weight=1)
@@ -280,6 +286,7 @@ class MainApp:
             master, bg=PANEL,
             highlightthickness=1, highlightbackground=BORDER,
         )
+        self.editor_panel = editor_panel
         editor_panel.grid(row=0, column=2, sticky="nsew", padx=(5, 10), pady=(0, 10))
         editor_panel.grid_rowconfigure(3, weight=1)
         editor_panel.grid_columnconfigure(0, weight=1)
@@ -361,6 +368,21 @@ class MainApp:
         self.editor.bind("<KeyRelease>", lambda _event: self.editor_changed())
         self.editor.bind("<Tab>", self.insert_spaces)
 
+    def _build_dashboard(self, master) -> None:
+        panel = Frame(
+            master, bg=PANEL,
+            highlightthickness=1, highlightbackground=BORDER,
+        )
+        self.dashboard_panel = panel
+        panel.grid(row=0, column=1, columnspan=2, sticky="nsew", padx=(5, 10), pady=(0, 10))
+        panel.grid_rowconfigure(1, weight=1)
+        panel.grid_columnconfigure(0, weight=1)
+
+        self._panel_heading(panel, "DASHBOARD").grid(row=0, column=0, sticky="ew", padx=7, pady=7)
+        self.dashboard_list = ScrollFrame(panel, bg=PANEL)
+        self.dashboard_list.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        panel.grid_remove()
+
     def _panel_heading(self, master, text: str) -> Label:
         image = self.images.get(ELEMENTS_DIR / "PanelTitleSettings.png", (500, 38))
         return Label(
@@ -415,16 +437,20 @@ class MainApp:
         self.notes.update_streak()
         self._render_background()
         self.refresh_all()
-        visible = self.notes.get_notes(limit=1)
-        if visible:
-            self.open_note(visible[0].id)
-        else:
-            self.new_note()
+        if self.current_view != "dashboard":
+            visible = self.notes.get_notes(limit=1)
+            if visible:
+                self.open_note(visible[0].id)
+            else:
+                self.new_note()
         self.root.mainloop()
 
     def refresh_all(self) -> None:
         self.refresh_folders()
-        self.refresh_note_list()
+        if self.current_view == "dashboard":
+            self.refresh_dashboard()
+        else:
+            self.refresh_note_list()
         self.refresh_status()
 
     def refresh_status(self) -> None:
@@ -484,6 +510,7 @@ class MainApp:
         self.force_save()
         self.current_view = view
         labels = {
+            "dashboard": "DASHBOARD",
             "all": "ALL NOTES",
             "pinned": "PINNED",
             "favorites": "FAVORITES",
@@ -497,10 +524,16 @@ class MainApp:
             title = labels.get(view, str(view))
         self.list_title.configure(text=title.upper())
         self.search_var.set("")
+        self._update_view_layout()
         self.refresh_folders()
-        self.refresh_note_list()
+        if self.current_view == "dashboard":
+            self.refresh_dashboard()
+        else:
+            self.refresh_note_list()
 
     def visible_notes(self, search: str = ""):
+        if self.current_view == "dashboard":
+            return []
         common = {"search": search, "limit": 500}
         if self.current_view == "pinned":
             return self.notes.get_notes(pinned=True, **common)
@@ -554,6 +587,8 @@ class MainApp:
     def search(self) -> None:
         if not hasattr(self, "note_list"):
             return
+        if self.current_view == "dashboard":
+            return
         query = self.search_var.get().strip()
         if query.startswith("#"):
             name = query[1:].strip().casefold()
@@ -562,6 +597,116 @@ class MainApp:
         else:
             result = self.visible_notes(query)
         self.refresh_note_list(result)
+
+    def _update_view_layout(self) -> None:
+        is_dashboard = self.current_view == "dashboard"
+        if is_dashboard:
+            self.note_panel.grid_remove()
+            self.editor_panel.grid_remove()
+            self.dashboard_panel.grid()
+            return
+        self.dashboard_panel.grid_remove()
+        self.note_panel.grid()
+        self.editor_panel.grid()
+
+    def refresh_dashboard(self) -> None:
+        snapshot = self.notes.get_dashboard_snapshot()
+        for widget in self.dashboard_list.inner.winfo_children():
+            widget.destroy()
+
+        stats = Frame(self.dashboard_list.inner, bg=PANEL_ALT, highlightthickness=1, highlightbackground="#2c5964")
+        stats.pack(fill=X, pady=(4, 8))
+        Label(
+            stats,
+            text=f"TOTAL NOTES  {snapshot['total_notes']}",
+            bg=PANEL_ALT,
+            fg=CYAN_BRIGHT,
+            font=(self.font, 12),
+        ).pack(anchor="w", padx=12, pady=(10, 2))
+        Label(
+            stats,
+            text=f"CURRENT STREAK  {snapshot['current_streak']} DAYS",
+            bg=PANEL_ALT,
+            fg=CYAN,
+            font=(self.font, 10),
+        ).pack(anchor="w", padx=12, pady=(0, 10))
+
+        self._render_dashboard_notes("RECENT NOTES", snapshot["recent_notes"])
+        self._render_dashboard_notes("PINNED NOTES", snapshot["pinned_notes"])
+
+        today = snapshot["today_daily_log"]
+        daily_section = self._dashboard_section("TODAY'S DAILY LOG")
+        if today:
+            self._dashboard_note_button(
+                daily_section,
+                today.title or snapshot["target_day"],
+                lambda note_id=today.id: self.open_note_from_dashboard(note_id),
+            )
+        else:
+            self._dashboard_note_button(daily_section, "CREATE TODAY'S LOG", self.open_daily_log)
+
+        vault = snapshot["random_brain_vault"]
+        vault_section = self._dashboard_section("RANDOM BRAIN VAULT ENTRY")
+        if vault:
+            self._dashboard_note_button(
+                vault_section,
+                vault.title or "Untitled",
+                lambda note_id=vault.id: self.open_note_from_dashboard(note_id),
+            )
+        else:
+            Label(
+                vault_section,
+                text="NO VAULT ENTRIES AVAILABLE",
+                bg=PANEL_ALT,
+                fg=MUTED,
+                font=(self.font, 9),
+                anchor="w",
+            ).pack(fill=X, padx=10, pady=(0, 10))
+
+    def _dashboard_section(self, title: str) -> Frame:
+        section = Frame(self.dashboard_list.inner, bg=PANEL_ALT, highlightthickness=1, highlightbackground="#2c5964")
+        section.pack(fill=X, pady=(0, 8))
+        Label(
+            section,
+            text=title,
+            bg=PANEL_ALT,
+            fg=CYAN_BRIGHT,
+            font=(self.font, 10),
+            anchor="w",
+        ).pack(fill=X, padx=10, pady=(10, 6))
+        return section
+
+    def _render_dashboard_notes(self, title: str, notes) -> None:
+        section = self._dashboard_section(title)
+        if not notes:
+            Label(
+                section,
+                text="NO NOTES",
+                bg=PANEL_ALT,
+                fg=MUTED,
+                font=(self.font, 9),
+                anchor="w",
+            ).pack(fill=X, padx=10, pady=(0, 10))
+            return
+        for note in notes:
+            self._dashboard_note_button(
+                section,
+                note.title or "Untitled",
+                lambda note_id=note.id: self.open_note_from_dashboard(note_id),
+            )
+
+    def _dashboard_note_button(self, master, text: str, command) -> None:
+        label = text
+        if len(label) > MAX_DASHBOARD_NOTE_TITLE_LENGTH:
+            max_length = MAX_DASHBOARD_NOTE_TITLE_LENGTH - len(TRUNCATION_SUFFIX)
+            label = f"{label[:max_length]}{TRUNCATION_SUFFIX}"
+        self._nav_button(master, label, command).pack(fill=X, padx=10, pady=(0, 6))
+
+    def open_note_from_dashboard(self, note_id: int | None) -> None:
+        if note_id is None:
+            return
+        self.set_view("all")
+        self.open_note(note_id)
 
     def new_note(self) -> None:
         self.force_save()

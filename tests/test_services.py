@@ -64,6 +64,24 @@ class ServiceTestCase(unittest.TestCase):
         second = self.notes.get_or_create_daily_log("2026-06-14")
         self.assertEqual(first.id, second.id)
 
+    def test_dashboard_snapshot_contains_expected_sections(self) -> None:
+        regular_id = self.notes.create_note(title="Regular note")
+        pinned_id = self.notes.create_note(title="Pinned note", is_pinned=1)
+        archived_id = self.notes.create_note(title="Archived note", is_archived=1)
+        vault_id = self.notes.create_note(title="Vault note", is_brain_vault=1)
+        daily = self.notes.get_or_create_daily_log("2026-06-14")
+        self.notes.update_streak(date(2026, 6, 14))
+
+        snapshot = self.notes.get_dashboard_snapshot(day="2026-06-14", recent_limit=5, pinned_limit=5)
+        self.assertEqual(snapshot["target_day"], "2026-06-14")
+        self.assertEqual(snapshot["total_notes"], 5)
+        self.assertEqual(snapshot["current_streak"], 1)
+        self.assertEqual(snapshot["today_daily_log"].id, daily.id)
+        self.assertEqual(snapshot["random_brain_vault"].id, vault_id)
+        self.assertEqual([note.id for note in snapshot["pinned_notes"]], [pinned_id])
+        self.assertNotIn(archived_id, [note.id for note in snapshot["recent_notes"]])
+        self.assertIn(regular_id, [note.id for note in snapshot["recent_notes"]])
+
     def test_streak_progression(self) -> None:
         start = date(2026, 6, 10)
         self.assertEqual(self.notes.update_streak(start), (1, 1))
