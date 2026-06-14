@@ -698,7 +698,8 @@ class MainApp:
     def _dashboard_note_button(self, master, text: str, command) -> None:
         label = text
         if len(label) > MAX_DASHBOARD_NOTE_TITLE_LENGTH:
-            label = f"{label[:MAX_DASHBOARD_NOTE_TITLE_LENGTH - len(TRUNCATION_SUFFIX)]}{TRUNCATION_SUFFIX}"
+            max_length = MAX_DASHBOARD_NOTE_TITLE_LENGTH - len(TRUNCATION_SUFFIX)
+            label = f"{label[:max_length]}{TRUNCATION_SUFFIX}"
         self._nav_button(master, label, command).pack(fill=X, padx=10, pady=(0, 6))
 
     def open_note_from_dashboard(self, note_id: int | None) -> None:
