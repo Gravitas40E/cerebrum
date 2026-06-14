@@ -4,6 +4,10 @@ Cerebrum is a local-first personal knowledge archive built with Python,
 tkinter, Pillow, and SQLite. Its interface uses the bundled Wenrexa Sci-Fi
 Minimalism UI pack and X Typewriter.
 
+<img width="1919" height="1031" alt="image" src="https://github.com/user-attachments/assets/285237da-0d73-47f4-a083-73e40860780c" />
+<img width="1919" height="1032" alt="image" src="https://github.com/user-attachments/assets/41970ec7-d9cf-4c5d-a634-70bbce6b75ec" />
+
+
 ## Requirements
 
 - Python 3.11 or newer
