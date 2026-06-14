@@ -2,7 +2,9 @@
 
 Cerebrum is a local-first personal knowledge archive for Windows. It combines structured note-taking, tagging, and lightweight knowledge-graph analysis in a desktop GUI built with Python, tkinter, Pillow, and SQLite. The interface uses the bundled Wenrexa Sci-Fi Minimalism UI pack and the X Typewriter font.
 
-![Cerebrum UI](<img width="1915" height="1029" alt="image" src="https://github.com/user-attachments/assets/b92f45c4-da92-4f56-96ce-22dc3fe3dfb1" />)
+<img width="1919" height="1029" alt="image" src="https://github.com/user-attachments/assets/0a7ea601-aedd-4a89-8f5a-93e3d6d49094" />
+<img width="1918" height="1032" alt="image" src="https://github.com/user-attachments/assets/b824866b-3fdd-49cb-8f15-bfac5a356768" />
+
 
 ## Capabilities
 
